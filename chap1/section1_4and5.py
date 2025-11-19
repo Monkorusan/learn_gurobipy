@@ -48,12 +48,12 @@ for j in J:
 model.update()
 
 for j in J:
-    sum_terms = (f"{c[j,i]}x_{j}{i}" for i in I)
+    sum_terms = (f"x_{j}{i}" for i in I)
     sum_string = " + ".join(sum_terms)
     model.addConstr(quicksum(x[j,i] for i in I)<=M[j], 
                     name=f"transportation cost from factory {j}: {sum_string} <= {M[j]}")
 for i in I:
-    sum_terms = (f"{c[j,i]}x_{j}{i}" for j in J)
+    sum_terms = (f"x_{j}{i}" for j in J)
     sum_string = " + ".join(sum_terms)
     model.addConstr(quicksum(x[j,i] for j in J)==d[i],
                     name=f"demands from guest {i}: {sum_string} <= {d[i]}")
@@ -93,3 +93,5 @@ for CCC in CC:
          improve per unit increase in the RHS of the constraint, holding all else 
          constant.
 """
+
+model.write("transport_problem.lp")
