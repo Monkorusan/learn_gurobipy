@@ -44,14 +44,20 @@ x = {} # x_ij dictionary: key ij, value variable x_ij
 for j in J:
     for i in I:
         x[j,i] = model.addVar(vtype='C',name=f'x({j},{i})')
-        model.addConstr(x[j,i]>=0)
+        model.addConstr(x[j,i]>=0,name=f"x_{j}{i}=>0")
 model.update()
 
 for j in J:
-    model.addConstr(quicksum(x[j,i] for i in I)<=M[j])
+    sum_terms = (f"{c[j,i]}x_{j}{i}" for i in I)
+    sum_string = " + ".join(sum_terms)
+    model.addConstr(quicksum(x[j,i] for i in I)<=M[j], 
+                    name=f"transportation cost from factory {j}: {sum_string} <= {M[j]}")
 for i in I:
-    model.addConstr(quicksum(x[j,i] for j in J)==d[i])
-
+    sum_terms = (f"{c[j,i]}x_{j}{i}" for j in J)
+    sum_string = " + ".join(sum_terms)
+    model.addConstr(quicksum(x[j,i] for j in J)==d[i],
+                    name=f"demands from guest {i}: {sum_string} <= {d[i]}")
+                    
 # totalcost = 0
 # for j in J:
 #     for i in I:
@@ -67,7 +73,23 @@ for (j,i) in x:
     if sol > EPS:
         print(f"sending quantity {sol} from factory {j} to guest {i}")
 
-print("\n")
-print([x[j,i].X for (j,i) in x])
-breakpoint()
+print(f"optimal solution = {[x[j,i].X for (j,i) in x]}")
 
+# 1.5: Dual problem version of 1.4
+CC = model.getConstrs()
+print("in a constraint: c_ji*x_ji means that it costs c_ij units to move from factory j to guest i")
+print("CONSTRAINTS ~ SLACK ~ PI table")
+for CCC in CC:
+  print(f"{CCC.ConstrName} ~ {CCC.Slack} ~ {CCC.Pi}")
+
+""" ============================ about Slack and Pi ============================ 
+- Slack: The slack of a constraint is the difference between the left-hand side (LHS) 
+         and the right-hand side (RHS) of the constraint, evaluated at the current 
+         solution. For a constraint (a^T)*x <= b, its slack is described as b-(a^T)*x .
+         Slack tells us how "loose" the constraint is at the solution x 
+         (slack is close to zero if things get too tight)
+- Pi:    The Pi attribute represents the dual value (shadow price) of the constraint 
+         in the optimal solution. It indicates how much the objective function would
+         improve per unit increase in the RHS of the constraint, holding all else 
+         constant.
+"""
