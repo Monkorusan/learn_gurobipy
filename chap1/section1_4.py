@@ -33,6 +33,7 @@ supply = [500, 500, 500]
 cost = [[4, 5, 6, 8, 10],
         [6, 4, 3, 5,  8],
         [9, 7, 4, 3,  4]]
+
 d = {key+1:value for key,value in enumerate(demand)} #guest_id:demand amount dict
 M = {key+1:value for key,value in enumerate(supply)} #factory_id:supply amount dict
 I = [i for i in range(1,len(demand)+1)] # 1 2 3 4 5
@@ -68,4 +69,5 @@ for (j,i) in x:
 
 print("\n")
 print([x[j,i].X for (j,i) in x])
+breakpoint()
 
