@@ -1,4 +1,4 @@
-# 1.2: Integer Linear Programming
+# 1.3: Integer Linear Programming
 from gurobipy import *
 model = Model("puzzle")
 x = model.addVar(name="x",vtype="I")
