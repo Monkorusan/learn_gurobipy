@@ -26,6 +26,7 @@ factory    | transportation cost c_ij |supply amount M_j
 """
 
 from gurobipy import *
+import numpy as np
 model = Model("transportation")
 
 demand = [80, 270, 250, 160, 180]
@@ -33,47 +34,49 @@ supply = [500, 500, 500]
 cost = [[4, 5, 6, 8, 10],
         [6, 4, 3, 5,  8],
         [9, 7, 4, 3,  4]]
+cost=np.array(cost)
+cost = cost.T
 
 d = {key+1:value for key,value in enumerate(demand)} #guest_id:demand amount dict
 M = {key+1:value for key,value in enumerate(supply)} #factory_id:supply amount dict
 I = [i for i in range(1,len(demand)+1)] # 1 2 3 4 5
 J = [j for j in range(1,len(supply)+1)] # 1 2 3
-c = {(j, i): cost[j-1][i-1] for j in J for i in I  }
+c = {(i, j): cost[i-1][j-1] for i in I for j in J}
 
 x = {} # x_ij dictionary: key ij, value variable x_ij
 for j in J:
     for i in I:
-        x[j,i] = model.addVar(vtype='C',name=f'x({j},{i})')
-        model.addConstr(x[j,i]>=0,name=f"x_{j}{i}=>0")
+        x[i,j] = model.addVar(vtype='C',lb=0,name=f'x({i},{j})')
+
 model.update()
 
 for j in J:
-    sum_terms = (f"x_{j}{i}" for i in I)
+    sum_terms = (f"x_{i}{j}" for i in I)
     sum_string = " + ".join(sum_terms)
-    model.addConstr(quicksum(x[j,i] for i in I)<=M[j], 
+    model.addConstr(quicksum(x[i,j] for i in I)<=M[j], 
                     name=f"transportation cost from factory {j}: {sum_string} <= {M[j]}")
 for i in I:
-    sum_terms = (f"x_{j}{i}" for j in J)
+    sum_terms = (f"x_{i}{j}" for j in J)
     sum_string = " + ".join(sum_terms)
-    model.addConstr(quicksum(x[j,i] for j in J)==d[i],
+    model.addConstr(quicksum(x[i,j] for j in J)==d[i],
                     name=f"demands from guest {i}: {sum_string} <= {d[i]}")
                     
 # totalcost = 0
 # for j in J:
 #     for i in I:
 #         totalcost = totalcost + c[j,i]*x[j,i]
-model.setObjective(quicksum(c[j,i]*x[j,i] for (j,i) in x), GRB.MINIMIZE)
+model.setObjective(quicksum(c[i,j]*x[i,j] for (i,j) in x), GRB.MINIMIZE)
 model.optimize()
 print("\n")
 print(f"minimized cost = {model.ObjVal}\n")
 EPS = 1e-6 # stands for Epsilon, represents tolerable calcualtion error.
 
-for (j,i) in x:
-    sol = x[j,i].X
+for (i,j) in x:
+    sol = x[i,j].X
     if sol > EPS:
         print(f"sending quantity {sol} from factory {j} to guest {i}")
 
-print(f"optimal solution = {[x[j,i].X for (j,i) in x]}")
+print(f"optimal solution = {[x[i,j].X for (i,j) in x]}")
 
 # 1.5: Dual problem version of 1.4
 CC = model.getConstrs()

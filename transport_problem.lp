@@ -1,6 +1,6 @@
 \ Model transportation
 \ LP format - for model browsing. Use MPS format to capture full model detail.
-\ Signature: 0x4d6b4f87e893cbe5
+\ Signature: 0x4d6b4f87e894946b
 Minimize
   4 x(1,1) + 5 x(1,2) + 6 x(1,3) + 8 x(1,4) + 10 x(1,5) + 6 x(2,1)
    + 4 x(2,2) + 3 x(2,3) + 5 x(2,4) + 8 x(2,5) + 9 x(3,1) + 7 x(3,2)
