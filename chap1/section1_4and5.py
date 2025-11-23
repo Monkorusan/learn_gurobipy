@@ -52,14 +52,14 @@ model.update()
 
 for j in J:
     sum_terms = (f"x_{i}{j}" for i in I)
-    sum_string = " + ".join(sum_terms)
+    sum_string = "+".join(sum_terms)
     model.addConstr(quicksum(x[i,j] for i in I)<=M[j], 
-                    name=f"transportation cost from factory {j}: {sum_string} <= {M[j]}")
+                    name=f"transportation_cost_from_factory_{j}___{sum_string}<={M[j]}")
 for i in I:
     sum_terms = (f"x_{i}{j}" for j in J)
-    sum_string = " + ".join(sum_terms)
+    sum_string = "+".join(sum_terms)
     model.addConstr(quicksum(x[i,j] for j in J)==d[i],
-                    name=f"demands from guest {i}: {sum_string} <= {d[i]}")
+                    name=f"demands_from_guest_{i}___{sum_string}<={d[i]}")
                     
 # totalcost = 0
 # for j in J:
