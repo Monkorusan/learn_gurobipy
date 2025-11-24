@@ -1,11 +1,12 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.animation as anime
 import gurobipy as grbpy
 import sys
 import networkx
 from collections import defaultdict
 
-def addcut(edges:list[tuple[int, int]], V:list, model:grbpy, x)->bool:
+def addcut(edges:list[tuple[int, int]], V:list, model, x)->bool:
     G = networkx.Graph()
     G.add_nodes_from(V)
     for (i,j) in edges:
@@ -86,27 +87,49 @@ def extract_tour(edges, n):
     return tour
 
 def main():
-    n = 100
+    is_animated = True
 
+    n = 100
     V:list = list(range(n))
     E:list[tuple[int, int]] = [(i, j) for i in V for j in V if i < j]
-    X:list[int] = np.random.randint(1, 40, n).tolist()
-    Y:list[int] = np.random.randint(1, 40, n).tolist()
+    start_point_x = 20
+    start_point_y = 20
+    X = [start_point_x] + np.random.randint(1, 40, n-1).tolist()
+    Y = [start_point_y] +  np.random.randint(1, 40, n-1).tolist()
     c = calc_dist_matrix(X,Y,round_decimal=3)
     obj, edges = solve_tsp(V,c)
     tour = extract_tour(edges,len(V))
     tour.append(tour[0])
     tour_x,tour_y = [X[i] for i in tour], [Y[i] for i in tour]
-    print(obj)
-
-    plt.figure(1)
+    # print(obj)
     colors = ['red'] + ['blue'] * (n - 1)
-    plt.scatter(X,Y,c=colors)
-    plt.plot(tour_x,tour_y,color='green')
-    plt.plot()
-    plt.grid()
-    plt.show()
 
+    if is_animated:
+        fig,ax = plt.subplots()
+        ax.set_title("TSP animated plot")
+        ax.scatter(X[0], Y[0], c='red', edgecolors='black', zorder=3)  # Highlight start node
+        ax.scatter(X[1:], Y[1:], c='blue', edgecolors='black',)
+        line, = ax.plot([],[],color='green') #tuple unpacking
+        ani = anime.FuncAnimation(
+            fig,
+            lambda num: (line.set_data(tour_x[:num+1], tour_y[:num+1]) or (line,)),
+            frames=len(tour_x),
+            init_func=line.set_data([],[]),
+            blit=True,
+            interval=100,
+            repeat=False)
+        plt.show()
+
+    else: #static plot
+        plt.figure(1)
+        plt.title("TSP static plot")
+        plt.scatter(X,Y,c=colors)
+        plt.plot(tour_x,tour_y,color='green')
+        plt.plot()
+        plt.grid()
+        plt.show()
+
+    #
 
 if __name__ == "__main__":
     main()
