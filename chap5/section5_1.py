@@ -20,8 +20,9 @@ def addcut(edges:list[tuple[int, int]], V:list, model, x)->bool:
     return True
 
 
-def solve_tsp(V:list, c:np.ndarray):
+def solve_tsp(V:list, c:np.ndarray, use_callback=False):
     x = {}
+    EPS = 1e-6
     model = grbpy.Model("tsp")
     for i in V:
         for j in V:
@@ -37,23 +38,42 @@ def solve_tsp(V:list, c:np.ndarray):
     model.setObjective(grbpy.quicksum(
         c[i,j]*x[i,j] for i in V for j in V if j>i),grbpy.GRB.MINIMIZE)
     
-    EPS = 1.e-6
-    while True:
-        model.optimize()
-        edges = []
-
-        for (i,j) in x:
-            if x[i,j].X > EPS:
-                edges.append( (i,j) )
-        
-        if addcut(edges,V,model,x) == False:
-            if model.IsMIP:
-                break
+    if use_callback: #textbook 
+        model.Params.DualReductions = 0
+        def tsp_callback(model,where):
+            if where != grbpy.GRB.Callback.MIPSOL:
+                return
+            edges=[]
             for (i,j) in x:
-                x[i,j].Vtype = grbpy.GRB.BINARY
-            model.update()
+                if model.cbGetSolution(x[i,j])>EPS:
+                    edges.append((i,j))
+            G = networkx.Graph()
+            G.add_edges_from(edges)
+            Components = list(networkx.connected_components(G))
+            if len(Components) == 1:
+                return
+            for S in Components:
+                model.cbLazy(grbpy.quicksum(x[i,j] for i in S for j in S if j>i)<=len(S)-1)
+            return
+        model.optimize(tsp_callback)
+        edges = [(i,j) for (i,j) in x if x[i,j].X > EPS]
+        return model.ObjVal, edges
 
-    return model.ObjVal, edges
+    else:
+        while True:
+            model.optimize()
+            edges = []
+            for (i,j) in x:
+                if x[i,j].X > EPS:
+                    edges.append( (i,j) )
+            if addcut(edges,V,model,x) == False:
+                if model.IsMIP:
+                    break
+                for (i,j) in x:
+                    x[i,j].Vtype = grbpy.GRB.BINARY
+                model.update()
+
+        return model.ObjVal, edges
 
 
 def calc_dist_matrix(X:np.ndarray,Y:np.ndarray,round_decimal:int=0)-> np.ndarray:
@@ -88,6 +108,7 @@ def extract_tour(edges, n):
 
 def main():
     is_animated = True
+    use_callback = False #do not set to true, textbook implementation seems skeptical
     np.random.seed(24)
 
     n = 100
@@ -98,7 +119,7 @@ def main():
     X = [start_point_x] + np.random.randint(1, 40, n-1).tolist()
     Y = [start_point_y] +  np.random.randint(1, 40, n-1).tolist()
     c = calc_dist_matrix(X,Y,round_decimal=3)
-    opt_ans, edges = solve_tsp(V,c)
+    opt_ans, edges = solve_tsp(V,c,use_callback)
     print(f"opt_ans = {opt_ans}")
 
     tour = extract_tour(edges,len(V))
@@ -135,3 +156,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+    
