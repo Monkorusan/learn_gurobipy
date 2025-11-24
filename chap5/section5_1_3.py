@@ -10,28 +10,28 @@ import matplotlib.animation as anime
 def scf(n,c):
     model = grbpy.Model("Asymmetric_TSP-Single_Flow_Commodity")
     x,f ={},{}
-    for i in range(1,n+1):
-        for j in range(1,n+1):
+    for i in range(n):
+        for j in range(n):
             if i != j:
                 x[i,j] = model.addVar(vtype=grbpy.GRB.BINARY)
-                if i==1:
+                if i==0:
                     f[i,j] = model.addVar(ub=n-1, vtype=grbpy.GRB.CONTINUOUS)
                 else:
                     f[i,j] = model.addVar(ub=n-2, vtype=grbpy.GRB.CONTINUOUS)
     model.update()
-    for i in range(1,n+1):
-        model.addConstr(grbpy.quicksum(x[i,j] for j in range(1,n+1) if j!=i)==1)
-        model.addConstr(grbpy.quicksum(x[j,i] for j in range(1,n+1) if j!=i)==1)
-    model.addConstr(grbpy.quicksum(f[1,j] for j in range(2,n+1))==n-1)
-    for i in range(2,n+1):
-        model.addConstr(grbpy.quicksum(f[j,i] for j in range(1,n+1) if j!=i)
-                        -grbpy.quicksum(f[i,j] for j in range(1,n+1) if j!=i)==1)
-    for j in range(2,n+1):
-        model.addConstr(f[1,j] <= (n-1)*x[1,j])
-        for i in range(2,n+1):
+    for i in range(n):
+        model.addConstr(grbpy.quicksum(x[i,j] for j in range(n) if j!=i)==1)
+        model.addConstr(grbpy.quicksum(x[j,i] for j in range(n) if j!=i)==1)
+    model.addConstr(grbpy.quicksum(f[0,j] for j in range(1,n))==n-1)
+    for i in range(1,n):
+        model.addConstr(grbpy.quicksum(f[j,i] for j in range(n) if j!=i)
+                        -grbpy.quicksum(f[i,j] for j in range(n) if j!=i)==1)
+    for j in range(1,n):
+        model.addConstr(f[0,j] <= (n-1)*x[0,j])
+        for i in range(1,n):
             if i != j :
                 model.addConstr(f[i,j] <= (n-2)*x[i,j]) 
-    model.setObjective(grbpy.quicksum(c[i-1,j-1]*x[i,j] for (i,j) in x),grbpy.GRB.MINIMIZE)
+    model.setObjective(grbpy.quicksum(c[i,j]*x[i,j] for (i,j) in x),grbpy.GRB.MINIMIZE)
     model.update()
     model.__data = x,f
     return model
@@ -68,16 +68,16 @@ def extract_tour(edges, n):
     for i,j in edges:
         adj[i].append(j)
         adj[j].append(i)
-    tour = [1] #assume that we start from node 1 (in 5_1_1, it's [0])
-    current = 1
+    tour = [0] #assume that we start from node 1 (in 5_1_1, it's [0])
+    current = 0
     prev = -1
     for temp in range(n-1):
         next_nodes = [node for node in adj[current] if node!= prev]
         next_node = next_nodes[0]
         tour.append(next_node)
         prev, current = current, next_node
-    return [node - 1 for node in tour]
-    # return tour
+    # return [node - 1 for node in tour] #use this if 1-based indexing is used.
+    return tour # 0-based indexing
 
 def solve_tsp(V:list, c:np.ndarray, n:int):
     EPS = 1e-6
@@ -104,7 +104,7 @@ def main():
     np.random.seed(24)
 
     n = 100
-    V:list = list(range(1,n+1))
+    V:list = list(range(n))
     E:list[tuple[int, int]] = [(i, j) for i in V for j in V if i < j]
     start_point_x = 20
     start_point_y = 20
