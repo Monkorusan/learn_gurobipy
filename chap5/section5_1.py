@@ -20,7 +20,7 @@ def addcut(edges:list[tuple[int, int]], V:list, model, x)->bool:
     return True
 
 
-def solve_tsp(V,c):
+def solve_tsp(V:list, c:np.ndarray):
     x = {}
     model = grbpy.Model("tsp")
     for i in V:
@@ -88,6 +88,7 @@ def extract_tour(edges, n):
 
 def main():
     is_animated = True
+    np.random.seed(24)
 
     n = 100
     V:list = list(range(n))
@@ -97,11 +98,12 @@ def main():
     X = [start_point_x] + np.random.randint(1, 40, n-1).tolist()
     Y = [start_point_y] +  np.random.randint(1, 40, n-1).tolist()
     c = calc_dist_matrix(X,Y,round_decimal=3)
-    obj, edges = solve_tsp(V,c)
+    opt_ans, edges = solve_tsp(V,c)
+    print(f"opt_ans = {opt_ans}")
+
     tour = extract_tour(edges,len(V))
     tour.append(tour[0])
     tour_x,tour_y = [X[i] for i in tour], [Y[i] for i in tour]
-    # print(obj)
     colors = ['red'] + ['blue'] * (n - 1)
 
     if is_animated:
@@ -125,16 +127,11 @@ def main():
         plt.title("TSP static plot")
         plt.scatter(X,Y,c=colors)
         plt.plot(tour_x,tour_y,color='green')
+        plt.xlabel('x')
+        plt.ylabel('y')
         plt.plot()
         plt.grid()
         plt.show()
 
-    #
-
 if __name__ == "__main__":
     main()
-
-    
-
-
-
