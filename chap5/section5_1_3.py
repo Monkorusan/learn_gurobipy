@@ -1,12 +1,40 @@
-# 5.1.1: Subtour Elimination Formulation (temporarily skip 5.1.2 and 5.1.3)
+# 5.1.3  Single Commodify Flow Formulation
 
-import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.animation as anime
 import gurobipy as grbpy
-import sys
+import numpy as np
 import networkx
+import matplotlib.pyplot as plt
 from collections import defaultdict
+import matplotlib.animation as anime
+
+def scf(n,c):
+    model = grbpy.Model("Asymmetric_TSP-Single_Flow_Commodity")
+    x,f ={},{}
+    for i in range(1,n+1):
+        for j in range(1,n+1):
+            if i != j:
+                x[i,j] = model.addVar(vtype=grbpy.GRB.BINARY)
+                if i==1:
+                    f[i,j] = model.addVar(ub=n-1, vtype=grbpy.GRB.CONTINUOUS)
+                else:
+                    f[i,j] = model.addVar(ub=n-2, vtype=grbpy.GRB.CONTINUOUS)
+    model.update()
+    for i in range(1,n+1):
+        model.addConstr(grbpy.quicksum(x[i,j] for j in range(1,n+1) if j!=i)==1)
+        model.addConstr(grbpy.quicksum(x[j,i] for j in range(1,n+1) if j!=i)==1)
+    model.addConstr(grbpy.quicksum(f[1,j] for j in range(2,n+1))==n-1)
+    for i in range(2,n+1):
+        model.addConstr(grbpy.quicksum(f[j,i] for j in range(1,n+1) if j!=i)
+                        -grbpy.quicksum(f[i,j] for j in range(1,n+1) if j!=i)==1)
+    for j in range(2,n+1):
+        model.addConstr(f[1,j] <= (n-1)*x[1,j])
+        for i in range(2,n+1):
+            if i != j :
+                model.addConstr(f[i,j] <= (n-2)*x[i,j]) 
+    model.setObjective(grbpy.quicksum(c[i-1,j-1]*x[i,j] for (i,j) in x),grbpy.GRB.MINIMIZE)
+    model.update()
+    model.__data = x,f
+    return model
 
 def addcut(edges:list[tuple[int, int]], V:list, model, x)->bool:
     G = networkx.Graph()
@@ -21,63 +49,6 @@ def addcut(edges:list[tuple[int, int]], V:list, model, x)->bool:
             grbpy.quicksum(x[i,j] for i in S for j in S if j>i)<=len(S)-1)
     return True
 
-
-def solve_tsp(V:list, c:np.ndarray, use_callback=False):
-    x = {}
-    EPS = 1e-6
-    model = grbpy.Model("tsp")
-    for i in V:
-        for j in V:
-            if j>i:
-                x[i,j] = model.addVar(ub=1)
-    model.update()
-
-    for i in V:
-        cstr1 = grbpy.quicksum(x[j,i] for j in V if j<i)
-        cstr2 = grbpy.quicksum(x[i,j] for j in V if j>i)
-        model.addConstr(cstr1 + cstr2 == 2)
-    
-    model.setObjective(grbpy.quicksum(
-        c[i,j]*x[i,j] for i in V for j in V if j>i),grbpy.GRB.MINIMIZE)
-    
-    if use_callback: #textbook 
-        model.Params.DualReductions = 0
-        def tsp_callback(model,where):
-            if where != grbpy.GRB.Callback.MIPSOL:
-                return
-            edges=[]
-            for (i,j) in x:
-                if model.cbGetSolution(x[i,j])>EPS:
-                    edges.append((i,j))
-            G = networkx.Graph()
-            G.add_edges_from(edges)
-            Components = list(networkx.connected_components(G))
-            if len(Components) == 1:
-                return
-            for S in Components:
-                model.cbLazy(grbpy.quicksum(x[i,j] for i in S for j in S if j>i)<=len(S)-1)
-            return
-        model.optimize(tsp_callback)
-        edges = [(i,j) for (i,j) in x if x[i,j].X > EPS]
-        return model.ObjVal, edges
-
-    else:
-        while True:
-            model.optimize()
-            edges = []
-            for (i,j) in x:
-                if x[i,j].X > EPS:
-                    edges.append( (i,j) )
-            if addcut(edges,V,model,x) == False:
-                if model.IsMIP:
-                    break
-                for (i,j) in x:
-                    x[i,j].Vtype = grbpy.GRB.BINARY
-                model.update()
-
-        return model.ObjVal, edges
-
-
 def calc_dist_matrix(X:np.ndarray,Y:np.ndarray,round_decimal:int=0)-> np.ndarray:
     if len(X) != len(Y): raise ValueError
     dist_matrix = np.zeros((len(X),len(Y)))
@@ -90,38 +61,57 @@ def calc_dist_matrix(X:np.ndarray,Y:np.ndarray,round_decimal:int=0)-> np.ndarray
                 if round_decimal != 0:
                     dist = np.round(dist,round_decimal)
                 dist_matrix[x,y] = dist
-    return dist_matrix  
-
+    return dist_matrix
 
 def extract_tour(edges, n):
     adj = defaultdict(list) #adjacency dictionary
     for i,j in edges:
         adj[i].append(j)
         adj[j].append(i)
-    tour = [0] #assume that we start from node 0
-    current = 0
+    tour = [1] #assume that we start from node 1 (in 5_1_1, it's [0])
+    current = 1
     prev = -1
     for temp in range(n-1):
         next_nodes = [node for node in adj[current] if node!= prev]
         next_node = next_nodes[0]
         tour.append(next_node)
         prev, current = current, next_node
-    return tour
+    return [node - 1 for node in tour]
+    # return tour
+
+def solve_tsp(V:list, c:np.ndarray, n:int):
+    EPS = 1e-6
+    model = scf(n,c)
+    x, f = model.__data 
+    
+    while True:
+        model.optimize()
+        edges = []
+        for (i,j) in x:
+            if x[i,j].X > EPS:
+                edges.append( (i,j) )
+        if addcut(edges,V,model,x) == False:
+            if model.IsMIP:
+                break
+            for (i,j) in x:
+                x[i,j].Vtype = grbpy.GRB.BINARY
+            model.update()
+
+    return model.ObjVal, edges
 
 def main():
     is_animated = True
-    use_callback = False #do not set to true, textbook implementation seems skeptical
     np.random.seed(24)
 
     n = 100
-    V:list = list(range(n))
+    V:list = list(range(1,n+1))
     E:list[tuple[int, int]] = [(i, j) for i in V for j in V if i < j]
     start_point_x = 20
     start_point_y = 20
     X = [start_point_x] + np.random.randint(1, 40, n-1).tolist()
     Y = [start_point_y] +  np.random.randint(1, 40, n-1).tolist()
     c = calc_dist_matrix(X,Y,round_decimal=3)
-    opt_ans, edges = solve_tsp(V,c,use_callback)
+    opt_ans, edges = solve_tsp(V,c,n)
     print(f"opt_ans = {opt_ans}")
 
     tour = extract_tour(edges,len(V))
@@ -158,5 +148,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-    
