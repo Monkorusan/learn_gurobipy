@@ -1,3 +1,5 @@
+# 5.1.1: Subtour Elimination Formulation (temporarily skip 5.1.2 and 5.1.3)
+
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as anime
