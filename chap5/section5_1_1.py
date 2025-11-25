@@ -28,7 +28,7 @@ def solve_tsp(V:list, c:np.ndarray, use_callback=False):
     for i in V:
         for j in V:
             if j>i:
-                x[i,j] = model.addVar(ub=1)
+                x[i,j] = model.addVar(ub=1,vtype=grbpy.GRB.BINARY)
     model.update()
 
     for i in V:
@@ -41,6 +41,7 @@ def solve_tsp(V:list, c:np.ndarray, use_callback=False):
     
     if use_callback: #textbook 
         model.Params.DualReductions = 0
+        model.Params.LazyConstraints = 1
         def tsp_callback(model,where):
             if where != grbpy.GRB.Callback.MIPSOL:
                 return
@@ -109,7 +110,7 @@ def extract_tour(edges, n):
 
 def main():
     is_animated = True
-    use_callback = False #do not set to true, textbook implementation seems skeptical
+    use_callback = True #do not set to true, textbook implementation seems skeptical
     np.random.seed(24)
 
     n = 100
