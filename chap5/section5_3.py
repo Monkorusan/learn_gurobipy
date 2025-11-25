@@ -8,6 +8,28 @@ import networkx
 from collections import defaultdict
 
 def vrp(V,c,m,q,Q):
+
+    def vrp_callback(model,where):
+        if where != grbpy.GRB.Callback.MIPSOL:
+            return
+        edges = []
+        for (i,j) in x:
+            if model.cbGetSolution(x[i,j])>0.5:
+                if i!=V[0] and j!=V[0]:
+                    edges.append((i,j))
+        G = networkx.Graph()
+        G.add_edges_from(edges)
+        Components = list(networkx.connected_components(G))
+        for S in Components:
+            S_card = len(S)
+            q_sum = sum(q[i] for i in S)
+            NS = int(np.ceil(float(q_sum)/Q))
+            S_edges = [(i,j) for i in S for j in S if i<j and (i,j) in edges]
+            if S_card >=3 and (len(S_edges)>=S_card or NS>1):
+                model.cbLazy(grbpy.quicksum(x[i,j] for i in S for j in S if j>i)<=S_card-NS)
+                print(f"adding cuts for {S_edges}")
+        return 
+
     model = grbpy.Model("Capacitated Vehicle Routing Problem")
     x = {}
     for i in V:
@@ -17,7 +39,7 @@ def vrp(V,c,m,q,Q):
             elif j>i:
                 x[i,j]=model.addVar(vtype=grbpy.GRB.INTEGER,ub=1)
     model.update()
-    model.addConstr(grbpy.quicksum(x[V[0],i] for j in V[1:])==2*m)
+    model.addConstr(grbpy.quicksum(x[V[0],j] for j in V[1:])==2*m)
     for i in V[1:]:
         cstr1 = grbpy.quicksum(x[j,i] for j in V if j<i)
         cstr2 = grbpy.quicksum(x[i,j] for j in V if j>i)
@@ -26,30 +48,8 @@ def vrp(V,c,m,q,Q):
         c[i,j]*x[i,j] for i in V for j in V if j>i),grbpy.GRB.MINIMIZE)
     model.update()
     model.__data = x
-    return model
-
-def vrp_callback(model,where):
-    if where != grbpy.GRB.Callback.MIPSOL:
-        return
-    edges = []
-    for (i,j) in x:
-        if model.cbGetSolution(x[i,j])>0.5:
-            if i!=V[0] and j!=V[0]
-                edges.append((i,j))
-    G = networkx.Graph()
-    G.add_edges_from(edges)
-    Components = list(networkx.connected_components(G))
-    for S in Components:
-        S_card = len(S)
-        q_sum = sum(q[i] for i in S)
-        NS = int(np.ceil(float(q_sum)/Q))
-        S_edges = [(i,j) for i in S for j in S if i<j and (i,j) in edges]
-        if S_card >=3 and (len(S_edges)>=S_card or NS>1):
-            model.cbLazy(grbpy.quicksum(x[i,j] for i in S for j in S if j>i)<=S_card-NS)
-            print(f"adding cuts for {S_edges}")
-    return 
-
-
+    return model, vrp_callback
+#### kokomadeha ok desu
 
 def addcut(edges:list[tuple[int, int]], V:list, model, x)->bool:
     G = networkx.Graph()
@@ -94,7 +94,7 @@ def extract_tour(edges, n):
     # return [node - 1 for node in tour] #use this if 1-based indexing is used.
     return tour # 0-based indexing
 
-def solve_tsp(V:list, c:np.ndarray, n:int, m, q , Q):
+def solve_tsp(V:list, c:np.ndarray, m, q , Q, n:int):
     EPS = 1e-6
     model = vrp(V,c,m,q,Q)
     x, f = model.__data 
@@ -128,7 +128,7 @@ def main():
     X = [start_point_x] + np.random.randint(1, 40, n-1).tolist()
     Y = [start_point_y] +  np.random.randint(1, 40, n-1).tolist()
     c = calc_dist_matrix(X,Y,round_decimal=3)
-    opt_ans, edges = solve_tsp(V,c,,n,m,q,Q)
+    opt_ans, edges = solve_tsp(V,c,m,q,Q,n)
     print(f"opt_ans = {opt_ans}")
 
     tour = extract_tour(edges,len(V))
