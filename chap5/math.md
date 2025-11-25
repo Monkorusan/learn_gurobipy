@@ -114,3 +114,32 @@ $$
 - **commodity delivery constraint 1:** There will be $N-1$ amounts of goods shipped from the starting point.
 - **commodity delivery constraint 2:** The amount of goods in the trunk is assumed to be subtracted by one whenever the truck passes by a node.
 - **capacity constraints:** No goods will be transported to a node if it is unvisited at the moment. 
+
+## Formulation (Capacitated Vehicle Routing Problem)
+
+In CVRP,  $x_{ij}$ is a  binary variable only when $\forall i<j , j=2,3,...,n$:
+- $x_{ij} = 1$ if the tour includes the edge from $i$ to $j$
+- $x_{ij} = 0$ otherwise
+
+
+
+Then the standard integer programming formulation is:
+
+$$
+\begin{align*}
+\text{minimize} \quad & \sum_{i \ne j} c_{ij} x_{ij} \\
+\text{subject to} \quad 
+& \sum_{j: j \ne i} x_{ij} = 1 \quad \forall i = 1,2,\dots,n \quad \text{(dimensional constraint)} \\
+& \sum_{j: j \ne i} x_{ji} = 1 \quad \forall i = 1,2,\dots,n \quad \text{(dimensional constraint)} \\
+& \sum_{j} f_{1j} = n-1  \quad \text{(commodity delivery constraint 1)} \\
+& \sum_{j} f_{ji}-\sum_{j} f_{ij} = 1 \quad \forall i = 2,3,\dots,n \quad \text{(commodity delivery constraint 2)} \\
+& f_{1j} \leq (n-1)x_{1j} \quad \forall j\ne 1 \quad \text{(capacity constraint)} \\
+& f_{ij} \leq (n-2)x_{ij} \quad \forall i\ne j ; j\ne 1 ; i\ne 1 ;\quad \text{(capacity constraint)} \\
+& x_{ij} \in \{0, 1\}\quad \forall i\ne j \\
+& f_{ij} \geq 0 \quad \forall i\ne j \quad \text{(commodity is non-negative)} \\
+\end{align*}
+$$
+- **dimensional constaint:** there can only be one piece of edge that enters and leaves a node.
+- **commodity delivery constraint 1:** There will be $N-1$ amounts of goods shipped from the starting point.
+- **commodity delivery constraint 2:** The amount of goods in the trunk is assumed to be subtracted by one whenever the truck passes by a node.
+- **capacity constraints:** No goods will be transported to a node if it is unvisited at the moment. 
