@@ -10,7 +10,7 @@ import networkx
 from collections import defaultdict
 from typing import Callable
 
-def vrp(V:list, c:np.ndarray, m:int, q:list[int], Q:int)->tuple[grbpy.Model, Callable[[grbpy.Model, int], None]]:
+def vrp(V:list[int], c:np.ndarray, m:int, q:list[int], Q:int)->tuple[grbpy.Model, Callable[[grbpy.Model, int], None]]:
     def vrp_callback(model,where): #type hint is alr abovementioned as a Callable
         if where != grbpy.GRB.Callback.MIPSOL:
             return
@@ -52,8 +52,8 @@ def vrp(V:list, c:np.ndarray, m:int, q:list[int], Q:int)->tuple[grbpy.Model, Cal
     model.__data = x
     return model, vrp_callback
 
-def addcut_vrp(edges:list[tuple[int, int]], V:list, model:grbpy.Model, x, q:list[int], Q:int)->bool:
-    """Add generalized subtour elimination constraints for VRP"""
+def addcut_vrp(edges:list[tuple[int, int]], V:list[int], model:grbpy.Model, x, q:list[int], Q:int)->bool:
+    """a generalized subtour elimination constraints for VRP"""
     
     G = networkx.Graph() 
     G.add_nodes_from(V)
@@ -72,13 +72,12 @@ def addcut_vrp(edges:list[tuple[int, int]], V:list, model:grbpy.Model, x, q:list
         if V[0] in S:
             continue
             
-        # Calculate total demand of this component
-        demand_S = sum(q[i] for i in S)
+        demand_S = sum(q[i] for i in S) 
         
-        # Calculate minimum vehicles needed
-        r_S = np.ceil(demand_S / Q)
         
-        # Add generalized subtour elimination constraint
+        r_S = np.ceil(demand_S / Q) # minimum vehicles needed
+        
+        # generalized subtour elimination constraint for VRP
         # Sum of edges in S must be <= |S| - r(S)
         model.addConstr(
             grbpy.quicksum(x[i,j] for i in S for j in S if j>i and (i,j) in x) 
@@ -88,30 +87,13 @@ def addcut_vrp(edges:list[tuple[int, int]], V:list, model:grbpy.Model, x, q:list
     return True
 
 
-def solve_vrp(V:list, c:np.ndarray, m:int, q:list[int], Q:int, use_callback=True)->tuple[float,list[tuple[int,int,int]]]:
+def solve_vrp(V:list, c:np.ndarray, m:int, q:list[int], Q:int)->tuple[float,list[tuple[int,int,int]]]:
     EPS = 1e-6
     model, vrp_callback_func = vrp(V,c,m,q,Q)
     x = model.__data
     
-    # Callback approach (automated)
     model.Params.LazyConstraints = 1
     model.optimize(vrp_callback_func)
-    # else:
-    #     # Manual branch-and-cut approach
-    #     while True:
-    #         model.optimize()
-            
-    #         # if model.SolCount == 0: #moved to outside of else block
-    #         #     raise ValueError("No feasible solution found")
-            
-    #         edges_for_cut = []
-    #         for (i,j) in x:
-    #             if x[i,j].X > EPS:
-    #                 edges_for_cut.append((i,j))
-            
-    #         # Add VRP-specific cuts
-    #         if not addcut_vrp(edges_for_cut, V, model, x, q, Q):
-    #             break
     
     if model.SolCount == 0:
         raise ValueError("No feasible solution found")
@@ -139,16 +121,8 @@ def calc_dist_matrix(X:np.ndarray,Y:np.ndarray,round_decimal:int=0)-> np.ndarray
                 dist_matrix[x,y] = dist
     return dist_matrix
 
-def extract_vrp_routes(edges_with_mult, V, m):
-    """
-    edges_with_mult: list of (i, j, mult) tuples (undirected edges)
-    V: list of nodes with V[0] as depot
-    m: max number of vehicles (routes) to extract
-    Returns: list of routes (each route is [0, ..., 0])
-    """
+def extract_vrp_routes(edges_with_mult:list[tuple[int,int,int]], V:list[int], m:int)->list[list[int]]:
     depot = V[0]
-
-    # Build edge counts and adjacency (undirected)
     edge_count = defaultdict(int)
     adj = defaultdict(set)
     for (i,j,mult) in edges_with_mult:
@@ -224,13 +198,12 @@ def extract_vrp_routes(edges_with_mult, V, m):
 
 def main():
     is_animated = True
-    use_callback = False  # False will not work!
     np.random.seed(1)
     n = 24 # num of destinations
     m = 4  # num of vehicles
     Q = 6  # capacity of each vehicle
     q = [0] + np.random.randint(1, 2, n).tolist()  # Depot has 0 demand, assume all guest only have 1 demand each
-    V:list = list(range(n+1))
+    V = list(range(n+1))
     start_point_x = 20
     start_point_y = 20
     X = [start_point_x] + np.random.randint(1, 40, n).tolist()
@@ -240,7 +213,7 @@ def main():
     print(f"Solving VRP with {n} nodes, {m} vehicles, capacity {Q}")
     print(f"Total demand: {sum(q)}, Average demand per vehicle: {sum(q)/m:.1f}")
     
-    opt_ans, edges = solve_vrp(V, c, m, q, Q, use_callback=use_callback)
+    opt_ans, edges = solve_vrp(V, c, m, q, Q)
     print(f"Optimal solution: {opt_ans:.2f}")
     print("Edge list (with multiplicity):")
     for (i,j,mult) in edges:
@@ -252,7 +225,6 @@ def main():
     for i, route in enumerate(routes):
         route_demand = sum(q[node] for node in route[1:-1])  # Exclude depot
         print(f"Route {i+1}: {route} (demand: {route_demand})")
-    
     # Define colors for different routes
     route_colors = ['green', 'orange', 'purple', 'cyan', 'magenta', 'yellow']
     colors = ['red'] + ['blue'] * (n - 1)
