@@ -1,4 +1,4 @@
-# 5.1.3  Single Commodify Flow Formulation
+# 5.1.3  Single Commodify Flow Formulation of the TSP
 
 import gurobipy as grbpy
 import numpy as np

@@ -1,4 +1,4 @@
-# 5.1.1: Subtour Elimination Formulation (temporarily skip 5.1.2 and 5.1.3)
+# 5.1.1: Subtour Elimination Formulation of the TSP
 
 import numpy as np
 import matplotlib.pyplot as plt
