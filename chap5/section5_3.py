@@ -1,4 +1,5 @@
 # 5.3 Capacitated Vehicle Routing Problem
+# standard VRP is both capacitated and only allow 1 trip per truck(only refill at the start)
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -7,9 +8,10 @@ import matplotlib.animation as anime
 import gurobipy as grbpy
 import networkx
 from collections import defaultdict
+from typing import Callable
 
-def vrp(V,c,m,q,Q):
-    def vrp_callback(model,where):
+def vrp(V:list, c:np.ndarray, m:int, q:list[int], Q:int)->tuple[grbpy.Model, Callable[[grbpy.Model, int], None]]:
+    def vrp_callback(model,where): #type hint is alr abovementioned as a Callable
         if where != grbpy.GRB.Callback.MIPSOL:
             return
         edges = []
@@ -50,24 +52,10 @@ def vrp(V,c,m,q,Q):
     model.__data = x
     return model, vrp_callback
 
-#addcut method is not suitable for directed graph like VRP
-# def addcut(edges:list[tuple[int, int]], V:list, model, x, demand, capacity)->bool:
-#     G = networkx.Graph()
-#     G.add_nodes_from(V)
-#     for (i,j) in edges:
-#         G.add_edge(i,j)
-#     Components = list(networkx.connected_components(G))
-#     if len(Components)==1:
-#         return False
-#     for S in Components:
-#         model.addConstr(
-#             grbpy.quicksum(x[i,j] for i in S for j in S if j>i)<=len(S)-1)
-#     return True
-
-def addcut_vrp(edges:list[tuple[int, int]], V:list, model:grbpy.Model, x, q:list[int], Q:int):
+def addcut_vrp(edges:list[tuple[int, int]], V:list, model:grbpy.Model, x, q:list[int], Q:int)->bool:
     """Add generalized subtour elimination constraints for VRP"""
     
-    G = networkx.Graph()  # Use undirected since x[i,j] represents undirected edges
+    G = networkx.Graph() 
     G.add_nodes_from(V)
     
     for (i,j) in edges:
@@ -100,37 +88,41 @@ def addcut_vrp(edges:list[tuple[int, int]], V:list, model:grbpy.Model, x, q:list
     return True
 
 
-def solve_vrp(V:list, c:np.ndarray, m, q, Q, use_callback=True):
+def solve_vrp(V:list, c:np.ndarray, m:int, q:list[int], Q:int, use_callback=True)->tuple[float,list[tuple[int,int,int]]]:
     EPS = 1e-6
     model, vrp_callback_func = vrp(V,c,m,q,Q)
     x = model.__data
     
-    if use_callback:
-        # Callback approach (automated)
-        model.Params.LazyConstraints = 1
-        model.optimize(vrp_callback_func)
-    else:
-        # Manual branch-and-cut approach
-        while True:
-            model.optimize()
+    # Callback approach (automated)
+    model.Params.LazyConstraints = 1
+    model.optimize(vrp_callback_func)
+    # else:
+    #     # Manual branch-and-cut approach
+    #     while True:
+    #         model.optimize()
             
-            if model.SolCount == 0:
-                raise ValueError("No feasible solution found")
+    #         # if model.SolCount == 0: #moved to outside of else block
+    #         #     raise ValueError("No feasible solution found")
             
-            edges = []
-            for (i,j) in x:
-                if x[i,j].X > EPS:
-                    edges.append((i,j))
+    #         edges_for_cut = []
+    #         for (i,j) in x:
+    #             if x[i,j].X > EPS:
+    #                 edges_for_cut.append((i,j))
             
-            # Add VRP-specific cuts
-            if not addcut_vrp(edges, V, model, x, q, Q):
-                break
+    #         # Add VRP-specific cuts
+    #         if not addcut_vrp(edges_for_cut, V, model, x, q, Q):
+    #             break
     
     if model.SolCount == 0:
         raise ValueError("No feasible solution found")
     
-    edges = [(i,j) for (i,j) in x if x[i,j].X > EPS]
-    return model.ObjVal, edges
+    edge_list_with_multiplicity = []
+    for (i,j) in x:
+        val = int(round(x[i,j].X))
+        if val > 0:
+            edge_list_with_multiplicity.append((i, j, val))
+    
+    return model.ObjVal, edge_list_with_multiplicity
 
 
 def calc_dist_matrix(X:np.ndarray,Y:np.ndarray,round_decimal:int=0)-> np.ndarray:
@@ -147,86 +139,102 @@ def calc_dist_matrix(X:np.ndarray,Y:np.ndarray,round_decimal:int=0)-> np.ndarray
                 dist_matrix[x,y] = dist
     return dist_matrix
 
-def extract_vrp_routes(edges, V, m):
-    """Extract m separate routes from VRP solution"""
+def extract_vrp_routes(edges_with_mult, V, m):
+    """
+    edges_with_mult: list of (i, j, mult) tuples (undirected edges)
+    V: list of nodes with V[0] as depot
+    m: max number of vehicles (routes) to extract
+    Returns: list of routes (each route is [0, ..., 0])
+    """
     depot = V[0]
-    
-    # Build adjacency list
-    adj = defaultdict(list)
-    for i,j in edges:
-        adj[i].append(j)
-        adj[j].append(i)
-    
+
+    # Build edge counts and adjacency (undirected)
+    edge_count = defaultdict(int)
+    adj = defaultdict(set)
+    for (i,j,mult) in edges_with_mult:
+        a, b = (i, j) if i < j else (j, i)
+        edge_count[(a,b)] += int(mult)
+        adj[i].add(j)
+        adj[j].add(i)
+
+    def has_unused_depot_edge():
+        return any(edge_count[(min(depot, nbr), max(depot, nbr))] > 0 for nbr in adj[depot])
+
+    def consume_edge(u, v):
+        a, b = (u, v) if u < v else (v, u)
+        if edge_count[(a,b)] <= 0:
+            return False
+        edge_count[(a,b)] -= 1
+        return True
+
     routes = []
-    visited_edges = set()
-    
-    # Start from depot and follow each route
-    for next_node in adj[depot]:
-        if (depot, next_node) in visited_edges or (next_node, depot) in visited_edges:
-            continue
-            
-        route = [depot]
-        current = next_node
-        prev = depot
-        
-        # Follow the route until returning to depot
-        while current != depot:
-            route.append(current)
-            visited_edges.add((min(prev, current), max(prev, current)))
-            
-            # Find next node
-            next_nodes = [node for node in adj[current] if node != prev]
-            if not next_nodes:
-                break
-            prev, current = current, next_nodes[0]
-        
-        route.append(depot)  # Close the route
-        routes.append(route)
-        
-        if len(routes) >= m:
+
+    # While we still can start a new route from depot and haven't reached m routes
+    while len(routes) < m and has_unused_depot_edge():
+        # pick a depot neighbor with an available edge
+        neighbors = [nbr for nbr in adj[depot] if edge_count[(min(depot, nbr), max(depot, nbr))] > 0]
+        if not neighbors:
             break
-    
+        next_node = neighbors[0]
+
+        # start route and consume depot->next_node
+        if not consume_edge(depot, next_node):
+            break
+        route = [depot]
+        prev = depot
+        current = next_node
+
+        # Walk until we return to depot
+        while True:
+            route.append(current)
+
+            # if current is depot (shouldn't be at first step), stop
+            if current == depot:
+                break
+
+            # choose a neighbor to continue: prefer any neighbor with unused edges excluding prev
+            next_candidates = [nbr for nbr in adj[current]
+                               if edge_count[(min(current, nbr), max(current, nbr))] > 0 and nbr != prev]
+
+            if next_candidates:
+                # go to the first available candidate
+                prev, current = current, next_candidates[0]
+                consume_edge(prev, current)
+                continue
+
+            # no non-prev neighbors with unused edges -> try to return to depot
+            if edge_count[(min(current, depot), max(current, depot))] > 0:
+                prev, current = current, depot
+                consume_edge(prev, current)
+                route.append(current)  # append depot
+                break
+
+            # stuck (no available edges) -> force close by appending depot (invalid but defensive)
+            # In a valid solution this should not occur.
+            route.append(depot)
+            break
+
+        # Ensure route ends with depot
+        if route[-1] != depot:
+            route.append(depot)
+
+        routes.append(route)
+
     return routes
 
-# def solve_vrp(V:list, c:np.ndarray, m, q , Q, n:int):
-#     EPS = 1e-6
-#     model, vrp_callbackfunc = vrp(V,c,m,q,Q)
-#     model.Params.LazyConstraints = 1
-#     x = model.__data 
-    
-#     while True:
-#         model.optimize(vrp_callbackfunc)
-#         if model.SolCount == 0:
-#             raise ValueError("no feasible sol!")
-#         edges = []
-#         for (i,j) in x:
-#             if x[i,j].X > EPS:
-#                 edges.append( (i,j) )
-
-#         if addcut_vrp(edges,V,model,x) == False:
-#             if model.IsMIP:
-#                 break
-#             for (i,j) in x:
-#                 x[i,j].Vtype = grbpy.GRB.BINARY
-#             model.update()
-
-#     return model.ObjVal, edges
-
 def main():
-    is_animated = False
-    use_callback = True  # Set to False to use manual branch-and-cut
-    np.random.seed(24)
-
-    n = 10 # num of destinations
-    m = 5  # num of vehicles
-    Q = 2  # capacity of each vehicle(gemini)
-    q = [0] + np.random.randint(1, 2, n-1).tolist()  # Depot has 0 demand
-    V:list = list(range(n))
-    E:list[tuple[int, int]] = [(i, j) for i in V for j in V if i < j]
+    is_animated = True
+    use_callback = False  # False will not work!
+    np.random.seed(1)
+    n = 24 # num of destinations
+    m = 4  # num of vehicles
+    Q = 6  # capacity of each vehicle
+    q = [0] + np.random.randint(1, 2, n).tolist()  # Depot has 0 demand, assume all guest only have 1 demand each
+    V:list = list(range(n+1))
     start_point_x = 20
     start_point_y = 20
-    X = [start_point_x] + np.random.randint(1, 40, n-1).tolist()
-    Y = [start_point_y] + np.random.randint(1, 40, n-1).tolist()
+    X = [start_point_x] + np.random.randint(1, 40, n).tolist()
+    Y = [start_point_y] + np.random.randint(1, 40, n).tolist()
     c = calc_dist_matrix(X,Y,round_decimal=3)
     
     print(f"Solving VRP with {n} nodes, {m} vehicles, capacity {Q}")
@@ -234,6 +242,9 @@ def main():
     
     opt_ans, edges = solve_vrp(V, c, m, q, Q, use_callback=use_callback)
     print(f"Optimal solution: {opt_ans:.2f}")
+    print("Edge list (with multiplicity):")
+    for (i,j,mult) in edges:
+        print(f"  ({i},{j}) x {mult}")
     
     # Extract separate routes for each vehicle
     routes = extract_vrp_routes(edges, V, m)
@@ -245,7 +256,6 @@ def main():
     # Define colors for different routes
     route_colors = ['green', 'orange', 'purple', 'cyan', 'magenta', 'yellow']
     colors = ['red'] + ['blue'] * (n - 1)
-
     if is_animated:
         fig, ax = plt.subplots(figsize=(10, 8))
         ax.set_title(f"VRP animated plot ({m} vehicles)")
@@ -262,8 +272,7 @@ def main():
         
         def animate(frame):
             for i, (line, route) in enumerate(zip(lines, routes)):
-                # Calculate how many nodes to show for this route
-                nodes_per_frame = len(route) / 50  # Adjust speed
+                nodes_per_frame = len(route) / total_frames  
                 num_nodes = min(len(route), int((frame + 1) * nodes_per_frame) + 1)
                 
                 if num_nodes > 1:
@@ -272,8 +281,6 @@ def main():
                     line.set_data(route_x, route_y)
             return lines
         
-        # Calculate total frames needed
-        max_route_len = max(len(route) for route in routes)
         total_frames = 50
         
         ani = anime.FuncAnimation(
