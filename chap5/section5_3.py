@@ -197,7 +197,8 @@ def extract_vrp_routes(edges_with_mult:list[tuple[int,int,int]], V:list[int], m:
     return routes
 
 def main():
-    is_animated = True
+    is_animated = False
+    save_video = True
     np.random.seed(1)
     n = 24 # num of destinations
     m = 4  # num of vehicles
@@ -262,6 +263,9 @@ def main():
             blit=True,
             interval=100,
             repeat=False)
+        
+        if save_video:
+            ani.save('vrp_animation.mp4', writer='ffmpeg', fps=10, dpi=300)
         plt.show()
 
     else:  # static plot
