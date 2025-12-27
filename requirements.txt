@@ -1,0 +1,5 @@
+numpy
+matplotlib
+networkx
+# gurobipy requires a license - install separately from https://www.gurobi.com/
+# Academic users can get a free academic license

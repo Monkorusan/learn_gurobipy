@@ -63,14 +63,12 @@ def addcut_vrp(edges:list[tuple[int, int]], V:list[int], model:grbpy.Model, x, q
     
     Components = list(networkx.connected_components(G))
     
-    # If only one component, no cuts needed
     if len(Components) == 1:
-        return False
+        return False # If only one component, no cuts needed
     
     for S in Components:
-        # Skip if depot is in this component (it's the main route)
         if V[0] in S:
-            continue
+            continue # Skip if depot is in this component (it's the main route)
             
         demand_S = sum(q[i] for i in S) 
         
@@ -183,22 +181,19 @@ def extract_vrp_routes(edges_with_mult:list[tuple[int,int,int]], V:list[int], m:
                 route.append(current)  # append depot
                 break
 
-            # stuck (no available edges) -> force close by appending depot (invalid but defensive)
-            # In a valid solution this should not occur.
-            route.append(depot)
+            route.append(depot) #the final destination is always the depot
             break
 
-        # Ensure route ends with depot
         if route[-1] != depot:
-            route.append(depot)
+            route.append(depot) # Ensure route ends with depot
 
         routes.append(route)
 
     return routes
 
 def main():
-    is_animated = False
-    save_video = True
+    is_animated = True
+    save_video = False
     np.random.seed(1)
     n = 24 # num of destinations
     m = 4  # num of vehicles
