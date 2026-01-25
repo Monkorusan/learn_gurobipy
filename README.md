@@ -164,6 +164,12 @@ where $x_{ijk}$ is the amount of product $k$ transported from factory $j$ to gue
 python chap5/section5_1_1.py
 ```
 
+**Visualization:**
+
+![TSP Subtour Elimination Animation](chap5/gif/tsp_subtour_elimination.gif)
+
+*Animated visualization of the optimal TSP tour using subtour elimination formulation*
+
 **Problem Formulation:**
 
 Given:
@@ -199,6 +205,12 @@ where:
 ```bash
 python chap5/section5_1_3.py
 ```
+
+**Visualization:**
+
+![TSP Single Commodity Flow Animation](chap5/gif/tsp_single_commodity_flow.gif)
+
+*Animated visualization of the optimal TSP tour using single commodity flow formulation. Note: This formulation produces the same optimal solution as the subtour elimination method (Section 5.1.1), hence the visualization is identical.*
 
 **Problem Formulation:**
 
@@ -240,6 +252,12 @@ where:
 ```bash
 python chap5/section5_3.py
 ```
+
+**Visualization:**
+
+![Capacitated VRP Animation](chap5/gif/vrp_capacitated.gif)
+
+*Animated visualization showing multiple vehicles serving customers from a central depot. Each vehicle route is color-coded, demonstrating capacity-constrained routing.*
 
 **Problem Formulation:**
 

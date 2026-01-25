@@ -110,7 +110,8 @@ def extract_tour(edges, n):
 
 def main():
     is_animated = True
-    use_callback = True #do not set to true, textbook implementation seems skeptical
+    use_callback = True #textbook implementation seems skeptical
+    save_gif = False #for readme file on github
     np.random.seed(24)
 
     n = 100
@@ -143,6 +144,11 @@ def main():
             blit=True,
             interval=100,
             repeat=False)
+        
+        if save_gif:
+            ani.save('tsp_subtour_elimination.gif', writer='imagemagick', fps=10, dpi=100)
+            print("GIF saved as tsp_subtour_elimination.gif")
+        
         plt.show()
 
     else: #static plot

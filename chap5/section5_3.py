@@ -193,7 +193,7 @@ def extract_vrp_routes(edges_with_mult:list[tuple[int,int,int]], V:list[int], m:
 
 def main():
     is_animated = True
-    save_video = False
+    save_gif = False
     np.random.seed(1)
     n = 24 # num of destinations
     m = 4  # num of vehicles
@@ -259,8 +259,10 @@ def main():
             interval=100,
             repeat=False)
         
-        if save_video:
-            ani.save('vrp_animation.mp4', writer='ffmpeg', fps=10, dpi=300)
+        if save_gif:
+            ani.save('vrp_capacitated.gif', writer='imagemagick', fps=10, dpi=100)
+            print("GIF saved as vrp_capacitated.gif")
+        
         plt.show()
 
     else:  # static plot
