@@ -101,6 +101,7 @@ def solve_tsp(V:list, c:np.ndarray, n:int):
 
 def main():
     is_animated = True
+    save_gif = False
     np.random.seed(24)
 
     n = 100
@@ -133,6 +134,11 @@ def main():
             blit=True,
             interval=100,
             repeat=False)
+        
+        if save_gif:
+            ani.save('tsp_single_commodity_flow.gif', writer='imagemagick', fps=10, dpi=100)
+            print("GIF saved as tsp_single_commodity_flow.gif")
+        
         plt.show()
 
     else: #static plot
