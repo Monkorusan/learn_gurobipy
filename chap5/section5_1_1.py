@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as anime
 import gurobipy as grbpy
 import networkx
+import time
 from collections import defaultdict
 
 def addcut(edges:list[tuple[int, int]], V:list, model, x)->bool:
@@ -109,11 +110,16 @@ def extract_tour(edges, n):
     return tour
 
 def main():
-    is_animated = True
+    is_animated = False
     use_callback = True #do not set to true, textbook implementation seems skeptical
-    np.random.seed(24)
+    use_time_record = True
+    start,end, exec_time = 0.0 , 0.0 , 0.0
+    if use_time_record:
+        start = time.perf_counter()
 
-    n = 100
+    np.random.seed(42)
+
+    n = 200
     V:list = list(range(n))
     E:list[tuple[int, int]] = [(i, j) for i in V for j in V if i < j]
     start_point_x = 20
@@ -123,6 +129,10 @@ def main():
     c = calc_dist_matrix(X,Y,round_decimal=3)
     opt_ans, edges = solve_tsp(V,c,use_callback)
     print(f"opt_ans = {opt_ans}")
+
+    if use_time_record:
+        end = time.perf_counter()
+        exec_time = end - start
 
     tour = extract_tour(edges,len(V))
     tour.append(tour[0])
@@ -147,7 +157,10 @@ def main():
 
     else: #static plot
         plt.figure(1)
-        plt.title("TSP static plot")
+        if use_time_record:
+            plt.title(f"TSP static plot ({n} cities) , solve time = {exec_time:.3} [s]")
+        else:
+            plt.title("TSP static plot")
         plt.scatter(X,Y,c=colors)
         plt.plot(tour_x,tour_y,color='green')
         plt.xlabel('x')
